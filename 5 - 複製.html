@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>經典踩地雷</title>
+    <style>
+        /* --- CSS 樣式區域 --- */
+        body {
+            background-color: #008080; /* 經典 Windows 桌面背景綠色 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            user-select: none; /* 防止使用者反白選取文字 */
+        }
+
+        /* 遊戲最外層容器 */
+        #game-container {
+            background-color: #c0c0c0;
+            padding: 6px;
+            /* 經典的凸起外框：左上白、右下深灰 */
+            border-top: 3px solid #ffffff;
+            border-left: 3px solid #ffffff;
+            border-bottom: 3px solid #808080;
+            border-right: 3px solid #808080;
+            display: inline-block;
+        }
+
+        /* 上方資訊列 (計數器與笑臉) */
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 6px;
+            margin-bottom: 6px;
+            /* 凹陷的外框：左上深灰、右下白 */
+            border-top: 2px solid #808080;
+            border-left: 2px solid #808080;
+            border-bottom: 2px solid #ffffff;
+            border-right: 2px solid #ffffff;
+        }
+
+        /* 數位計數器 (黑底紅字) */
+        .digital-display {
+            background-color: #000000;
+            color: #ff0000;
+            font-family: 'Courier New', Courier, monospace; /* 使用等寬字體模擬數位感 */
+            font-size: 24px;
+            font-weight: bold;
+            padding: 2px 4px;
+            width: 45px;
+            text-align: center;
+            line-height: 1;
+            /* 微微的凹陷感 */
+            border-top: 1px solid #808080;
+            border-left: 1px solid #808080;
+            border-bottom: 1px solid #ffffff;
+            border-right: 1px solid #ffffff;
+        }
+
+        /* 笑臉按鈕 */
+        #reset-btn {
+            font-size: 20px;
+            width: 32px;
+            height: 32px;
+            background-color: #c0c0c0;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            /* 按鈕凸起 */
+            border-top: 2px solid #ffffff;
+            border-left: 2px solid #ffffff;
+            border-bottom: 2px solid #808080;
+            border-right: 2px solid #808080;
+            outline: none;
+        }
+
+        #reset-btn:active {
+            /* 按下時變凹陷 */
+            border-top: 2px solid #808080;
+            border-left: 2px solid #808080;
+            border-bottom: 2px solid #ffffff;
+            border-right: 2px solid #ffffff;
+        }
+
+        /* 網格區域 */
+        #grid {
+            display: grid;
+            background-color: #7b7b7b;
+            /* 凹陷的外框 */
+            border-top: 3px solid #808080;
+            border-left: 3px solid #808080;
+            border-bottom: 3px solid #ffffff;
+            border-right: 3px solid #ffffff;
+        }
+
+        /* 單一格子 */
+        .cell {
+            width: 20px;
+            height: 20px;
+            background-color: #c0c0c0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            /* 預設為凸起狀態 */
+            border-top: 2px solid #ffffff;
+            border-left: 2px solid #ffffff;
+            border-bottom: 2px solid #808080;
+            border-right: 2px solid #808080;
+            box-sizing: border-box; /* 確保邊框算在寬高內 */
+        }
+
+        /* 已掀開的格子 */
+        .cell.revealed {
+            /* 變成平坦並加上細灰線 */
+            border: 1px solid #808080;
+            border-top: none;
+            border-left: none;
+            background-color: #c0c0c0;
+            cursor: default;
+        }
+
+        /* 踩到地雷的格子 */
+        .cell.mine-hit {
+            background-color: #ff0000; /* 紅底 */
+        }
+
+        /* 數字顏色定義 */
+        .color-1 { color: #0000ff; } /* 藍 */
+        .color-2 { color: #008000; } /* 綠 */
+        .color-3 { color: #ff0000; } /* 紅 */
+        .color-4 { color: #000080; } /* 深藍 */
+        .color-5 { color: #800000; } /* 深紅 */
+        .color-6 { color: #008080; } /* 青色 */
+        .color-7 { color: #000000; } /* 黑 */
+        .color-8 { color: #808080; } /* 灰 */
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="header">
+            <div id="mines-count" class="digital-display">010</div>
+            <button id="reset-btn">🙂</button>
+            <div id="timer" class="digital-display">000</div>
+        </div>
+        <div id="grid"></div>
+    </div>
+
+    <script>
+        /* --- JavaScript 邏輯區域 --- */
+        const ROWS = 9;
+        const COLS = 9;
+        const MINES = 10;
+        
+        let board = [];
+        let revealedCount = 0;
+        let flagsCount = 0;
+        let isGameOver = false;
+        let timerInterval = null;
+        let timeElapsed = 0;
+        let isFirstClick = true;
+
+        const gridElement = document.getElementById('grid');
+        const resetBtn = document.getElementById('reset-btn');
+        const minesDisplay = document.getElementById('mines-count');
+        const timerDisplay = document.getElementById('timer');
+
+        // 初始化遊戲
+        function initGame() {
+            gridElement.style.gridTemplateColumns = `repeat(${COLS}, 20px)`;
+            gridElement.innerHTML = '';
+            board = [];
+            revealedCount = 0;
+            flagsCount = 0;
+            isGameOver = false;
+            isFirstClick = true;
+            timeElapsed = 0;
+            clearInterval(timerInterval);
+            updateTimerDisplay();
+            updateMinesDisplay();
+            resetBtn.textContent = '🙂';
+
+            // 建立二維陣列與 DOM 元素
+            for (let r = 0; r < ROWS; r++) {
+                let row = [];
+                for (let c = 0; c < COLS; c++) {
+                    const cellData = {
+                        r: r,
+                        c: c,
+                        isMine: false,
+                        isRevealed: false,
+                        isFlagged: false,
+                        neighborMines: 0,
+                        element: document.createElement('div')
+                    };
+                    
+                    cellData.element.classList.add('cell');
+                    
+                    // 綁定左鍵點擊事件
+                    cellData.element.addEventListener('click', () => handleLeftClick(r, c));
+                    // 綁定右鍵點擊事件 (並阻止預設右鍵選單)
+                    cellData.element.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        handleRightClick(r, c);
+                    });
+                    // 按下滑鼠時笑臉會變 (小彩蛋)
+                    cellData.element.addEventListener('mousedown', (e) => {
+                        if (e.button === 0 && !isGameOver && !cellData.isRevealed) resetBtn.textContent = '😮';
+                    });
+                    cellData.element.addEventListener('mouseup', () => {
+                        if (!isGameOver) resetBtn.textContent = '🙂';
+                    });
+
+                    gridElement.appendChild(cellData.element);
+                    row.push(cellData);
+                }
+                board.push(row);
+            }
+        }
+
+        // 放置地雷 (確保第一次點擊絕對不會是地雷)
+        function placeMines(firstClickR, firstClickC) {
+            let minesPlaced = 0;
+            while (minesPlaced < MINES) {
+                let r = Math.floor(Math.random() * ROWS);
+                let c = Math.floor(Math.random() * COLS);
+                // 如果這格還沒有地雷，且不是玩家第一次點擊的那格，才放地雷
+                if (!board[r][c].isMine && !(r === firstClickR && c === firstClickC)) {
+                    board[r][c].isMine = true;
+                    minesPlaced++;
+                }
+            }
+            calculateNeighbors();
+        }
+
+        // 計算每個格子周圍的地雷數
+        function calculateNeighbors() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c].isMine) continue;
+                    let count = 0;
+                    // 檢查周圍 8 個方向 (九宮格)
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            let nr = r + dr;
+                            let nc = c + dc;
+                            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc].isMine) {
+                                count++;
+                            }
+                        }
+                    }
+                    board[r][c].neighborMines = count;
+                }
+            }
+        }
+
+        // 左鍵點擊處理
+        function handleLeftClick(r, c) {
+            if (isGameOver || board[r][c].isRevealed || board[r][c].isFlagged) return;
+
+            let cell = board[r][c];
+
+            // 處理第一次點擊
+            if (isFirstClick) {
+                isFirstClick = false;
+                placeMines(r, c);
+                startTimer();
+            }
+
+            // 踩到地雷
+            if (cell.isMine) {
+                gameOver(r, c);
+                return;
+            }
+
+            // 安全掀開
+            revealCell(r, c);
+            checkWin();
+        }
+
+        // 右鍵點擊處理 (插旗子)
+        function handleRightClick(r, c) {
+            if (isGameOver || board[r][c].isRevealed) return;
+
+            let cell = board[r][c];
+            if (!cell.isFlagged) {
+                cell.isFlagged = true;
+                cell.element.textContent = '🚩';
+                flagsCount++;
+            } else {
+                cell.isFlagged = false;
+                cell.element.textContent = '';
+                flagsCount--;
+            }
+            updateMinesDisplay();
+        }
+
+        // 掀開格子邏輯
+        function revealCell(r, c) {
+            let cell = board[r][c];
+            if (cell.isRevealed || cell.isFlagged) return;
+
+            cell.isRevealed = true;
+            cell.element.classList.add('revealed');
+            revealedCount++;
+
+            // 如果周圍有地雷，顯示數字和顏色
+            if (cell.neighborMines > 0) {
+                cell.element.textContent = cell.neighborMines;
+                cell.element.classList.add('color-' + cell.neighborMines);
+            } else {
+                // 如果周圍沒有地雷 (數字為 0)，自動擴散掀開周圍的格子
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        let nr = r + dr;
+                        let nc = c + dc;
+                        if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                            revealCell(nr, nc); // 這裡用到遞迴
+                        }
+                    }
+                }
+            }
+        }
+
+        // 遊戲結束 (失敗)
+        function gameOver(hitR, hitC) {
+            isGameOver = true;
+            clearInterval(timerInterval);
+            resetBtn.textContent = '😵';
+
+            // 顯示所有地雷
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let cell = board[r][c];
+                    if (cell.isMine) {
+                        cell.isRevealed = true;
+                        cell.element.classList.add('revealed');
+                        // 如果是踩到的那顆，背景變紅
+                        if (r === hitR && c === hitC) {
+                            cell.element.classList.add('mine-hit');
+                        }
+                        cell.element.textContent = '💣';
+                    } else if (cell.isFlagged && !cell.isMine) {
+                        // 插錯旗子的地方顯示 X
+                        cell.element.textContent = '❌';
+                    }
+                }
+            }
+        }
+
+        // 檢查是否獲勝
+        function checkWin() {
+            // 如果所有安全的格子都被掀開了
+            if (revealedCount === (ROWS * COLS) - MINES) {
+                isGameOver = true;
+                clearInterval(timerInterval);
+                resetBtn.textContent = '😎';
+                
+                // 將剩下的地雷全部標上旗子
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        let cell = board[r][c];
+                        if (cell.isMine && !cell.isFlagged) {
+                            cell.element.textContent = '🚩';
+                        }
+                    }
+                }
+                flagsCount = MINES;
+                updateMinesDisplay();
+            }
+        }
+
+        // 計時器功能
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeElapsed++;
+                if (timeElapsed > 999) timeElapsed = 999;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        // 更新右上角時間顯示
+        function updateTimerDisplay() {
+            timerDisplay.textContent = timeElapsed.toString().padStart(3, '0');
+        }
+
+        // 更新左上角剩餘地雷數顯示
+        function updateMinesDisplay() {
+            let remaining = MINES - flagsCount;
+            // 處理負數情況 (插旗數量大於總雷數)
+            if (remaining < 0) {
+                minesDisplay.textContent = "-" + Math.abs(remaining).toString().padStart(2, '0');
+            } else {
+                minesDisplay.textContent = remaining.toString().padStart(3, '0');
+            }
+        }
+
+        // 綁定重新開始按鈕
+        resetBtn.addEventListener('click', initGame);
+
+        // 啟動遊戲
+        initGame();
+
+    </script>
+</body>
+</html>
